@@ -1,0 +1,55 @@
+name: Daily Manga Scraper
+
+on:
+  schedule:
+    # Run every day at 00:00 UTC (adjust as needed)
+    - cron: '0 0 * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      book_url:
+        description: 'Book URL to scrape (optional, uses default if not provided)'
+        required: false
+        default: 'https://www.comicbox.xyz/book/4638?id=4638'
+
+jobs:
+  scrape-manga:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run scraper
+      env:
+        BOOK_URL: ${{ github.event.inputs.book_url || 'https://www.comicbox.xyz/book/4638?id=4638' }}
+      run: |
+        python scraper.py
+        
+    - name: Commit and push changes
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add downloads/
+        git diff --staged --quiet || git commit -m "Update manga downloads [skip ci]"
+        git push
+      continue-on-error: true
+      
+    - name: Upload manga as artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: manga-downloads
+        path: downloads/
+        retention-days: 30
+      if: always()
